@@ -603,7 +603,12 @@ export class ReservationsView {
     // ==========================================
     function renderFlightManifest() {
       const actionsEl = container.querySelector('#res-actions');
-      actionsEl.innerHTML = '';
+      actionsEl.innerHTML = `
+        <button class="btn btn-secondary" id="btn-print-manifest">
+          🖨 Imprimir Manifiesto de Cabina
+        </button>
+      `;
+      actionsEl.querySelector('#btn-print-manifest').onclick = () => window.print();
 
       const flights = sys.flightService.listFlights();
 

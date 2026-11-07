@@ -97,3 +97,38 @@ button, input, select, textarea {
 ::-webkit-scrollbar-thumb:hover {
   background: var(--color-primary);
 }
+
+/* Estilos de Impresión Oficial (Manifiesto de Vuelo) */
+@media print {
+  body {
+    background: #fff !important;
+    color: #000 !important;
+  }
+  .sidebar, .header, .tabs-header, .page-actions, .filter-bar, .btn, .auth-wrapper, #toast-container {
+    display: none !important;
+  }
+  .main-content {
+    margin-left: 0 !important;
+  }
+  .page-container {
+    padding: 0 !important;
+    max-width: 100% !important;
+  }
+  .manifest-card {
+    border: 1px solid #000 !important;
+    box-shadow: none !important;
+    background: #fff !important;
+  }
+  .manifest-banner {
+    background: #e2e8f0 !important;
+    color: #000 !important;
+    border-bottom: 2px solid #000 !important;
+  }
+  .data-table th, .data-table td {
+    color: #000 !important;
+    border: 1px solid #cbd5e1 !important;
+  }
+  .data-table th {
+    background: #f1f5f9 !important;
+  }
+}

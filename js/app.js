@@ -1,6 +1,6 @@
 /**
  * AeroFastTrack - Controlador Principal de la Aplicación (App)
- * Ensambla el ciclo de vida, rutas, shell de navegación y autenticación visual.
+ * Ensambla el ciclo de vida, rutas, shell de navegación, perfil de usuario y búsqueda global.
  */
 
 import { system } from './core/system-context.js';
@@ -11,6 +11,8 @@ import { LocationsView } from './views/locations-view.js';
 import { AirlinesView } from './views/airlines-view.js';
 import { FlightsView } from './views/flights-view.js';
 import { ReservationsView } from './views/reservations-view.js';
+import { modal } from './components/modal.js';
+import { toast } from './components/toast.js';
 import { runAllTests } from '../test-runner.js';
 
 class Application {
@@ -94,9 +96,13 @@ class Application {
           </div>
 
           <div class="sidebar-footer">
-            <div class="system-status">
+            <div class="system-status" style="margin-bottom: 0.75rem;">
               <div class="status-dot"></div>
               <span>Sistema en Línea (Memoria POO)</span>
+            </div>
+            <div style="display: flex; gap: 0.5rem;">
+              <button class="btn btn-secondary btn-sm" id="btn-about-system" style="flex: 1; font-size: 0.75rem; padding: 0.35rem 0.5rem;">ℹ Acerca de</button>
+              <button class="btn btn-secondary btn-sm" id="btn-reset-seed" style="flex: 1; font-size: 0.75rem; padding: 0.35rem 0.5rem;" title="Restablecer datos originales de prueba">🔄 Reiniciar</button>
             </div>
           </div>
         </aside>
@@ -116,10 +122,17 @@ class Application {
                   <span class="clock-badge" id="clock-local">00:00:00</span>
                 </div>
               </div>
+
+              <!-- BUSCADOR RÁPIDO GLOBAL -->
+              <div class="search-input-wrapper header-search-box" style="width: 250px; margin-left: 1rem;">
+                <span class="search-icon">🔍</span>
+                <input type="text" id="header-global-search" class="search-input" placeholder="Buscar vuelo, cliente, reserva..." style="padding-top: 0.35rem; padding-bottom: 0.35rem; font-size: 0.8rem;" />
+              </div>
             </div>
 
             <div class="header-right">
-              <div class="user-profile">
+              <!-- PERFIL DEL USUARIO CLICKEABLE -->
+              <div class="user-profile" id="user-profile-trigger" style="cursor: pointer;" title="Ver perfil de usuario">
                 <div class="user-avatar">${this._currentUser.name.charAt(0)}</div>
                 <div class="user-details">
                   <span class="user-name">${this._currentUser.name}</span>
@@ -156,6 +169,68 @@ class Application {
       toggleBtn.onclick = () => sidebar.classList.toggle('open');
     }
 
+    // Modal de Perfil de Usuario
+    root.querySelector('#user-profile-trigger').onclick = () => {
+      this.openUserProfileModal();
+    };
+
+    // Modal Acerca de
+    root.querySelector('#btn-about-system').onclick = () => {
+      this.openAboutModal();
+    };
+
+    // Botón Reiniciar Datos de Prueba
+    root.querySelector('#btn-reset-seed').onclick = async () => {
+      const confirmed = await modal.confirm({
+        title: '¿Restablecer Datos de Fábrica?',
+        message: 'Esto recargará todos los datos iniciales de prueba especificados en la guía técnica (5 países, 4 tipos de documento, 3 clientes, 5 ciudades, 6 aeropuertos, 3 aerolíneas, 8 vuelos y 4 reservas). Los registros nuevos creados se descartarán.',
+        confirmText: 'Restablecer',
+      });
+      if (confirmed) {
+        // Reinicializar contexto
+        this._sys = new (system.constructor)().init();
+        toast.success('Datos Reiniciados', 'Se han restablecido los datos de muestra originales.');
+        this._updateSidebarBadges();
+        this.renderCurrentModule();
+      }
+    };
+
+    // Buscador Global en el encabezado
+    const globalSearch = root.querySelector('#header-global-search');
+    globalSearch.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        const query = globalSearch.value.trim().toUpperCase();
+        if (!query) return;
+
+        // Verificar si coincide con un vuelo
+        const flight = this._sys.flightService.listFlights().find((f) => f.flightName === query);
+        if (flight) {
+          this.navigateTo('flights');
+          toast.info('Búsqueda Global', `Vuelo ${flight.flightName} localizado.`);
+          return;
+        }
+
+        // Verificar si coincide con un cliente
+        const cust = this._sys.customerService.listCustomers().find((c) => c.id === query || c.fullName.toUpperCase().includes(query));
+        if (cust) {
+          this.navigateTo('customers');
+          toast.info('Búsqueda Global', `Cliente ${cust.fullName} localizado.`);
+          return;
+        }
+
+        // Verificar si coincide con una reserva
+        const resId = query.replace('#', '');
+        const res = this._sys.reservationService.listReservations().find((r) => String(r.id) === resId);
+        if (res) {
+          this.navigateTo('reservations');
+          toast.info('Búsqueda Global', `Reserva #${res.id} localizada.`);
+          return;
+        }
+
+        toast.warning('Sin Coincidencias', `No se encontró ningún registro para '${query}'.`);
+      }
+    });
+
     // Cerrar sesión
     root.querySelector('#btn-logout').onclick = () => {
       this._currentUser = null;
@@ -164,6 +239,82 @@ class Application {
     };
 
     this.renderCurrentModule();
+  }
+
+  openUserProfileModal() {
+    const user = this._currentUser;
+    const bodyHtml = `
+      <div style="display: flex; align-items: center; gap: 1.25rem; margin-bottom: 1.5rem; padding: 1rem; background: var(--bg-input); border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+        <div style="width: 56px; height: 56px; border-radius: 50%; background: linear-gradient(135deg, var(--color-primary), var(--color-accent)); display: flex; align-items: center; justify-content: center; font-size: 1.5rem; font-weight: 700; color: #fff;">
+          ${user.name.charAt(0)}
+        </div>
+        <div>
+          <h3 style="font-size: 1.15rem; color: #fff;">${user.name}</h3>
+          <span class="badge badge-accent">${user.role}</span>
+        </div>
+      </div>
+
+      <div class="form-grid">
+        <div class="form-group">
+          <label class="form-label">Correo Institucional</label>
+          <input type="text" class="form-control" disabled value="${user.email}" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Código de Despachador</label>
+          <input type="text" class="form-control" disabled value="DSP-2026-088" style="font-family: monospace;" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Turno Operativo</label>
+          <input type="text" class="form-control" disabled value="Turno Rotativo - Hangar Central" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Nivel de Autorización</label>
+          <input type="text" class="form-control" disabled value="Acceso Total (POO Layer Admin)" />
+        </div>
+      </div>
+
+      <div style="margin-top: 1.25rem; padding: 0.75rem; background: rgba(6, 182, 212, 0.08); border-left: 3px solid var(--color-accent); border-radius: var(--radius-sm); font-size: 0.8rem; color: var(--text-muted);">
+        Perfil de sesión local para administración y auditoría de vuelos. La autenticación con token JWT o base de datos se integrará cuando el backend esté disponible.
+      </div>
+    `;
+
+    modal.open({
+      title: 'Perfil del Usuario de Operaciones',
+      bodyHtml,
+      confirmText: 'Entendido',
+      confirmClass: 'btn-primary',
+      onConfirm: () => true,
+    });
+  }
+
+  openAboutModal() {
+    const bodyHtml = `
+      <div style="text-align: center; margin-bottom: 1.5rem;">
+        <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">✈️</div>
+        <h2 style="color: #fff; font-size: 1.4rem;">AeroFastTrack v1.0.0</h2>
+        <p style="font-size: 0.85rem; color: var(--color-accent); font-weight: 600;">Sistema de Gestión de Operaciones Aéreas (POO en Java / Web)</p>
+      </div>
+
+      <div style="font-size: 0.9rem; color: var(--text-muted); line-height: 1.6; display: flex; flex-direction: column; gap: 0.75rem;">
+        <p><strong>Desarrollador:</strong> Juan Manuel Vélez Buitrago (@JuanMv514)</p>
+        <p><strong>Base Técnica:</strong> Guía de desarrollo en equipo: Sistema Airlines-poo en Java (POO) - 9 entidades, 4 capas, 29 casos de prueba.</p>
+        <p><strong>Decisiones de Diseño:</strong></p>
+        <ul style="padding-left: 1.25rem; font-size: 0.85rem;">
+          <li>Arquitectura en 4 capas desacopladas: UI, Servicios de Dominio, Repositorios en Memoria y Modelo de Clases.</li>
+          <li>Sillas modeladas como Value Objects inmutables (Seat con filas 1 a 12 y asientos A a F).</li>
+          <li>Control de vuelos nocturnos con cálculo exacto de duración al cruzar medianoche.</li>
+          <li>Integridad referencial cruzada que impide eliminar entidades con dependencias activas.</li>
+        </ul>
+      </div>
+    `;
+
+    modal.open({
+      title: 'Acerca del Sistema AeroFastTrack',
+      bodyHtml,
+      confirmText: 'Cerrar',
+      confirmClass: 'btn-secondary',
+      onConfirm: () => true,
+    });
   }
 
   _startClock() {
