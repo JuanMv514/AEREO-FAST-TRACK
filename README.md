@@ -76,6 +76,16 @@ El sistema incluye bloqueos preventivos que reflejan el comportamiento de claves
 
 ---
 
+## 💾 Persistencia Local y Guía de Sustentación (Etapa 2)
+1. **Persistencia Desacoplada (LocalStorage)**:
+   - Los repositorios implementan observadores reactivos que guardan el estado automáticamente ante cualquier inserción, actualización o eliminación.
+   - Al recargar la página (`F5`), cerrar y reabrir el navegador, todos los clientes, vuelos y reservas creados por el usuario se conservan intactos.
+   - El botón **`🔄 Reiniciar`** en el pie del menú lateral permite restablecer las semillas exactas de la guía en cualquier momento con un solo clic.
+2. **Guía de Sustentación Punta a Punta**:
+   - Sección en el menú lateral con el guion paso a paso documentado para la defensa y sustentación del proyecto (Ubicaciones ➔ Aerolíneas ➔ Vuelos ➔ Clientes ➔ Reservas ➔ Manifiesto ➔ Reporte Mensual ➔ Integridad Referencial).
+
+---
+
 ## 🧪 Verificación y Casos de Prueba
 El proyecto incluye un módulo interactivo en vivo y un archivo de pruebas (`test.html`) que ejecuta y certifica el 100% de los 29 casos de prueba definidos en la guía:
 

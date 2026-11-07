@@ -35,7 +35,7 @@ export function runAllTests() {
     }
   }
 
-  const sys = new SystemContext().init();
+  const sys = new SystemContext(false).init();
 
   // MÓDULO 1: CLIENTES Y CATÁLOGOS
   assertThrows('1. Crear país con nombre de 21 caracteres -> Rechazo', () => {

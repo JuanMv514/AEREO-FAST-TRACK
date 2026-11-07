@@ -4,6 +4,7 @@
  * - Colección interna privada (Map)
  * - Protección contra exposición de referencias mutables
  * - Métodos de consulta complementarios
+ * - Listener reactivo de cambios para persistencia desacoplada
  */
 
 import { DuplicateException, NotFoundException } from './exceptions.js';
@@ -17,6 +18,25 @@ export class InMemoryRepository {
     this._entityName = entityName;
     this._idExtractor = idExtractor;
     this._storage = new Map();
+    this._onChangeListener = null;
+  }
+
+  /**
+   * Registra un observador que se ejecutará tras cualquier mutación.
+   * @param {Function} listener 
+   */
+  setOnChangeListener(listener) {
+    this._onChangeListener = listener;
+  }
+
+  _triggerChange() {
+    if (typeof this._onChangeListener === 'function') {
+      try {
+        this._onChangeListener();
+      } catch (e) {
+        console.warn('Error en listener de cambio:', e);
+      }
+    }
   }
 
   /**
@@ -31,6 +51,7 @@ export class InMemoryRepository {
       throw new DuplicateException(`Ya existe un registro de ${this._entityName} con el identificador '${id}'`, this._entityName);
     }
     this._storage.set(key, entity);
+    this._triggerChange();
     return entity;
   }
 
@@ -67,6 +88,7 @@ export class InMemoryRepository {
       throw new NotFoundException(`No existe un registro de ${this._entityName} con el identificador '${id}' para actualizar`, this._entityName);
     }
     this._storage.set(key, entity);
+    this._triggerChange();
     return entity;
   }
 
@@ -78,7 +100,11 @@ export class InMemoryRepository {
   deleteById(id) {
     if (id === null || id === undefined) return false;
     const key = String(id);
-    return this._storage.delete(key);
+    const deleted = this._storage.delete(key);
+    if (deleted) {
+      this._triggerChange();
+    }
+    return deleted;
   }
 
   /**

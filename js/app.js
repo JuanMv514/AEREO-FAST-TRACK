@@ -1,6 +1,7 @@
 /**
  * AeroFastTrack - Controlador Principal de la Aplicación (App)
- * Ensambla el ciclo de vida, rutas, shell de navegación, perfil de usuario y búsqueda global.
+ * Ensambla el ciclo de vida, rutas, shell de navegación, perfil de usuario,
+ * búsqueda global, persistencia local y guía de sustentación punta a punta.
  */
 
 import { system } from './core/system-context.js';
@@ -87,7 +88,11 @@ class Application {
               <span class="nav-item-badge" id="badge-res-count">${this._sys.reservationService.countReservations()}</span>
             </div>
 
-            <div class="nav-section-title">Control de Calidad</div>
+            <div class="nav-section-title">Evaluación & Defensa</div>
+            <div class="nav-item ${this._currentModule === 'guide' ? 'active' : ''}" data-nav="guide">
+              <span class="nav-item-icon">📖</span>
+              <span>Guía de Sustentación</span>
+            </div>
             <div class="nav-item ${this._currentModule === 'tests' ? 'active' : ''}" data-nav="tests">
               <span class="nav-item-icon">🧪</span>
               <span>Casos de Prueba (29)</span>
@@ -96,13 +101,13 @@ class Application {
           </div>
 
           <div class="sidebar-footer">
-            <div class="system-status" style="margin-bottom: 0.75rem;">
+            <div class="system-status" style="margin-bottom: 0.6rem;">
               <div class="status-dot"></div>
-              <span>Sistema en Línea (Memoria POO)</span>
+              <span>Persistencia: Local Activa</span>
             </div>
             <div style="display: flex; gap: 0.5rem;">
               <button class="btn btn-secondary btn-sm" id="btn-about-system" style="flex: 1; font-size: 0.75rem; padding: 0.35rem 0.5rem;">ℹ Acerca de</button>
-              <button class="btn btn-secondary btn-sm" id="btn-reset-seed" style="flex: 1; font-size: 0.75rem; padding: 0.35rem 0.5rem;" title="Restablecer datos originales de prueba">🔄 Reiniciar</button>
+              <button class="btn btn-secondary btn-sm" id="btn-reset-seed" style="flex: 1; font-size: 0.75rem; padding: 0.35rem 0.5rem;" title="Restablecer datos originales del PDF">🔄 Reiniciar</button>
             </div>
           </div>
         </aside>
@@ -183,13 +188,12 @@ class Application {
     root.querySelector('#btn-reset-seed').onclick = async () => {
       const confirmed = await modal.confirm({
         title: '¿Restablecer Datos de Fábrica?',
-        message: 'Esto recargará todos los datos iniciales de prueba especificados en la guía técnica (5 países, 4 tipos de documento, 3 clientes, 5 ciudades, 6 aeropuertos, 3 aerolíneas, 8 vuelos y 4 reservas). Los registros nuevos creados se descartarán.',
+        message: 'Esto recargará todos los datos iniciales de prueba especificados en la guía técnica (5 países, 4 tipos de documento, 3 clientes, 5 ciudades, 6 aeropuertos, 3 aerolíneas, 8 vuelos y 4 reservas). Los registros creados se descartarán.',
         confirmText: 'Restablecer',
       });
       if (confirmed) {
-        // Reinicializar contexto
-        this._sys = new (system.constructor)().init();
-        toast.success('Datos Reiniciados', 'Se han restablecido los datos de muestra originales.');
+        this._sys.resetToSeedData();
+        toast.success('Datos Reiniciados', 'Se han restablecido los datos originales de la guía.');
         this._updateSidebarBadges();
         this.renderCurrentModule();
       }
@@ -274,7 +278,7 @@ class Application {
       </div>
 
       <div style="margin-top: 1.25rem; padding: 0.75rem; background: rgba(6, 182, 212, 0.08); border-left: 3px solid var(--color-accent); border-radius: var(--radius-sm); font-size: 0.8rem; color: var(--text-muted);">
-        Perfil de sesión local para administración y auditoría de vuelos. La autenticación con token JWT o base de datos se integrará cuando el backend esté disponible.
+        Perfil de sesión local para administración y auditoría de vuelos. La persistencia en navegador (LocalStorage) conserva sus cambios entre recargas (F5).
       </div>
     `;
 
@@ -304,6 +308,7 @@ class Application {
           <li>Sillas modeladas como Value Objects inmutables (Seat con filas 1 a 12 y asientos A a F).</li>
           <li>Control de vuelos nocturnos con cálculo exacto de duración al cruzar medianoche.</li>
           <li>Integridad referencial cruzada que impide eliminar entidades con dependencias activas.</li>
+          <li>Persistencia en LocalStorage desacoplada mediante observadores reactivos en la capa de repositorios.</li>
         </ul>
       </div>
     `;
@@ -384,12 +389,125 @@ class Application {
       case 'reservations':
         ReservationsView.render(container, this._sys);
         break;
+      case 'guide':
+        this.renderGuideView(container);
+        break;
       case 'tests':
         this.renderTestSuiteView(container);
         break;
       default:
         DashboardView.render(container, this._sys, (m) => this.navigateTo(m));
     }
+  }
+
+  renderGuideView(container) {
+    container.innerHTML = `
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">Guía de Sustentación y Recorrido Punta a Punta</h1>
+          <p class="page-subtitle">Guion paso a paso documentado para la defensa y evaluación técnica ante el docente</p>
+        </div>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+        
+        <!-- PASO 1 -->
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">1. Ubicaciones: Ciudades y Aeropuertos</h3>
+            <button class="btn btn-secondary btn-sm" id="btn-guide-loc">Ir a Ubicaciones ➔</button>
+          </div>
+          <p style="font-size: 0.9rem; color: var(--text-muted); line-height: 1.5;">
+            <strong>Qué demostrar:</strong> Las ciudades generan sus IDs de 1 en 1 de forma consecutiva (1, 1). Los aeropuertos generan identificadores universales <code>UUID v4</code> únicos y exigen una ciudad asociada. Intente registrar dos aeropuertos con el mismo nombre en la misma ciudad para demostrar el rechazo de negocio.
+          </p>
+        </div>
+
+        <!-- PASO 2 -->
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">2. Aerolíneas y Generador de IDs</h3>
+            <button class="btn btn-secondary btn-sm" id="btn-guide-airl">Ir a Aerolíneas ➔</button>
+          </div>
+          <p style="font-size: 0.9rem; color: var(--text-muted); line-height: 1.5;">
+            <strong>Qué demostrar:</strong> Las aerolíneas inician en 100 y avanzan de 10 en 10 (100, 110, 120, 130...). Se puede renombrar una aerolínea conservando su nombre, pero el sistema rechaza si intenta duplicar el nombre de otra empresa.
+          </p>
+        </div>
+
+        <!-- PASO 3 -->
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">3. Programación de Vuelos y Tiempos</h3>
+            <button class="btn btn-secondary btn-sm" id="btn-guide-fl">Ir a Vuelos ➔</button>
+          </div>
+          <p style="font-size: 0.9rem; color: var(--text-muted); line-height: 1.5;">
+            <strong>Qué demostrar:</strong> El sistema rechaza si el aeropuerto de salida y llegada son el mismo, o si la llegada es anterior a la salida. Muestre el vuelo <code>WG2010</code>: sale a las 23:30 y aterriza a las 01:10 del día siguiente, calculando automáticamente una duración exacta de <strong>1 h 40 min</strong>.
+          </p>
+        </div>
+
+        <!-- PASO 4 -->
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">4. Clientes y Catálogos</h3>
+            <button class="btn btn-secondary btn-sm" id="btn-guide-cust">Ir a Clientes ➔</button>
+          </div>
+          <p style="font-size: 0.9rem; color: var(--text-muted); line-height: 1.5;">
+            <strong>Qué demostrar:</strong> Los clientes se ordenan por apellido y nombre. El identificador de documento es inmutable (sin setter). El correo opcional valida unicidad en el sistema.
+          </p>
+        </div>
+
+        <!-- PASO 5 -->
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">5. Reservas en Cabina y Regla de Sillas</h3>
+            <button class="btn btn-secondary btn-sm" id="btn-guide-res">Ir a Reservas ➔</button>
+          </div>
+          <p style="font-size: 0.9rem; color: var(--text-muted); line-height: 1.5;">
+            <strong>Qué demostrar:</strong> Utilice el Asistente (Wizard) para emitir una reserva. Abra el mapa de cabina (<code>SeatPicker</code>) y compruebe que las sillas ocupadas aparecen bloqueadas en rojo. Intente asignar una silla ya vendida para observar el bloqueo en tiempo real.
+          </p>
+        </div>
+
+        <!-- PASO 6 -->
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">6. Manifiesto Oficial de Despacho</h3>
+            <button class="btn btn-secondary btn-sm" id="btn-guide-manifest">Ver Manifiesto ➔</button>
+          </div>
+          <p style="font-size: 0.9rem; color: var(--text-muted); line-height: 1.5;">
+            <strong>Qué demostrar:</strong> Seleccione el vuelo <code>AV8520</code>. Compruebe cómo los pasajeros aparecen ordenados ascendentemente por la combinación de fila y letra de la silla (<code>1A</code>, <code>1B</code>, <code>2A</code>). Presione <strong>Imprimir Manifiesto</strong> para mostrar la hoja oficial de cabina lista para impresión.
+          </p>
+        </div>
+
+        <!-- PASO 7 -->
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">7. Reporte Mensual por Aerolínea (uspVuelosPorAerolinea)</h3>
+            <button class="btn btn-secondary btn-sm" id="btn-guide-rep">Ver Reporte Mensual ➔</button>
+          </div>
+          <p style="font-size: 0.9rem; color: var(--text-muted); line-height: 1.5;">
+            <strong>Qué demostrar:</strong> Seleccione el mes de Noviembre de 2026. Compruebe cómo los vuelos se agrupan ordenados alfabéticamente por aerolínea y cronológicamente por salida. Luego seleccione un mes sin vuelos para verificar el mensaje <em>"Sin vuelos en ese periodo"</em>.
+          </p>
+        </div>
+
+        <!-- PASO 8 -->
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">8. Integridad Referencial Cruzada</h3>
+          </div>
+          <p style="font-size: 0.9rem; color: var(--text-muted); line-height: 1.5;">
+            <strong>Qué demostrar:</strong> Vaya a Aerolíneas e intente eliminar <em>Avianca</em>: el sistema lo rechazará porque tiene vuelos asignados. Vaya a Clientes e intente eliminar a <em>Carlos Gómez</em>: el sistema lo rechazará porque tiene reservas vigentes. Al cancelar la reserva de Carlos Gómez, sus sillas se liberarán de inmediato en el mapa de cabina.
+          </p>
+        </div>
+
+      </div>
+    `;
+
+    container.querySelector('#btn-guide-loc').onclick = () => this.navigateTo('locations');
+    container.querySelector('#btn-guide-airl').onclick = () => this.navigateTo('airlines');
+    container.querySelector('#btn-guide-fl').onclick = () => this.navigateTo('flights');
+    container.querySelector('#btn-guide-cust').onclick = () => this.navigateTo('customers');
+    container.querySelector('#btn-guide-res').onclick = () => this.navigateTo('reservations');
+    container.querySelector('#btn-guide-manifest').onclick = () => this.navigateTo('reservations');
+    container.querySelector('#btn-guide-rep').onclick = () => this.navigateTo('flights');
   }
 
   renderTestSuiteView(container) {
