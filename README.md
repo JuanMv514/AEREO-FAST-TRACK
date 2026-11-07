@@ -87,11 +87,26 @@ El sistema incluye bloqueos preventivos que reflejan el comportamiento de claves
 ---
 
 ## 🧪 Verificación y Casos de Prueba
-El proyecto incluye un módulo interactivo en vivo y un archivo de pruebas (`test.html`) que ejecuta y certifica el 100% de los 29 casos de prueba definidos en la guía:
+El proyecto incluye un módulo interactivo en vivo y suites de prueba automatizadas:
 
-```bash
-Total de pruebas: 29 | Pasaron: 29 (100%) | Fallaron: 0
-```
+1. **Pruebas de Dominio y Reglas de Negocio Java POO (`test.html`)**:
+   - 29 casos de prueba unitarios que validan los 5 módulos, restricciones de unicidad, inmutabilidad de Value Objects, cálculo de duraciones y reglas de negocio.
+   ```bash
+   Total de pruebas: 29 | Pasaron: 29 (100%) | Fallaron: 0
+   ```
+
+2. **Auditoría de Persistencia Local e Integridad (`test-persistence.html`)**:
+   - 12 escenarios de prueba obligatorios que certifican:
+     - Persistencia de clientes tras recarga y reapertura de sesión.
+     - Preservación de relaciones cruzadas (Ciudad-Aeropuerto, Aerolínea-Vuelo).
+     - Persistencia de reservas múltiples, bloqueo y liberación de sillas.
+     - Restablecimiento limpio de datos semilla sin registros residuales.
+     - Aislamiento estricto de las pruebas unitarias para no contaminar los datos de trabajo.
+     - Detección de payloads dañados con respaldo seguro en cuarentena (`aerofasttrack_corrupt_backup_*`).
+     - Idempotencia y ausencia de duplicados tras múltiples recargas continuas.
+   ```bash
+   Total Escenarios: 12 | Pasaron: 12 (100%) | Fallaron: 0
+   ```
 
 ---
 

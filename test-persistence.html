@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>AeroFastTrack - Verificación Etapa 2: Persistencia y Reglas</title>
+  <style>
+    body { font-family: system-ui, sans-serif; background: #0b192c; color: #fff; padding: 2rem; }
+    h1, h2 { color: #38bdf8; }
+    .card { background: #1e293b; border-radius: 8px; padding: 1.5rem; margin-bottom: 1.5rem; border: 1px solid #334155; }
+    .test { padding: 10px 14px; margin-bottom: 6px; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; }
+    .passed { background: #064e3b; color: #6ee7b7; border-left: 5px solid #10b981; }
+    .failed { background: #7f1d1d; color: #fca5a5; border-left: 5px solid #ef4444; }
+    .details { font-size: 0.85rem; color: #94a3b8; margin-top: 4px; }
+  </style>
+</head>
+<body>
+  <h1>AeroFastTrack - Auditoría y Pruebas Obligatorias Etapa 2</h1>
+  
+  <div class="card">
+    <h2>12 Escenarios Obligatorios de Persistencia (Etapa 2)</h2>
+    <div id="persistence-summary"></div>
+    <div id="persistence-results"></div>
+  </div>
+
+  <div class="card">
+    <h2>29 Casos de Prueba Unitarios y de Dominio POO</h2>
+    <div id="unit-summary"></div>
+    <div id="unit-results"></div>
+  </div>
+
+  <script type="module">
+    import { runPersistenceScenarios } from './test-persistence.js';
+    import { runAllTests } from './test-runner.js';
+
+    // 1. Ejecutar Escenarios de Persistencia
+    const pResults = runPersistenceScenarios();
+    const pContainer = document.getElementById('persistence-results');
+    const pSummary = document.getElementById('persistence-summary');
+
+    let pPassed = 0;
+    pResults.forEach(r => {
+      const div = document.createElement('div');
+      div.className = `test ${r.passed ? 'passed' : 'failed'}`;
+      div.innerHTML = `
+        <div>
+          <strong>${r.name}</strong>
+          ${r.details ? `<div class="details">${r.details}</div>` : ''}
+        </div>
+        <span>${r.passed ? '✓ PASÓ' : '✗ FALLÓ'}</span>
+      `;
+      pContainer.appendChild(div);
+      if (r.passed) pPassed++;
+    });
+    pSummary.innerHTML = `<h3>Total Escenarios: ${pResults.length} | Pasaron: ${pPassed} | Fallaron: ${pResults.length - pPassed}</h3>`;
+    console.log(`PERSISTENCE_SUMMARY: ${pPassed}/${pResults.length} PASSED`);
+
+    // 2. Ejecutar Pruebas Unitarias
+    const uResults = runAllTests();
+    const uContainer = document.getElementById('unit-results');
+    const uSummary = document.getElementById('unit-summary');
+
+    let uPassed = 0;
+    uResults.forEach(r => {
+      const div = document.createElement('div');
+      div.className = `test ${r.passed ? 'passed' : 'failed'}`;
+      div.innerHTML = `
+        <div>
+          <span>${r.name}</span>
+          ${r.error ? `<div class="details">${r.error}</div>` : ''}
+        </div>
+        <strong>${r.passed ? '✓ PASÓ' : '✗ FALLÓ'}</strong>
+      `;
+      uContainer.appendChild(div);
+      if (r.passed) uPassed++;
+    });
+    uSummary.innerHTML = `<h3>Total Casos: ${uResults.length} | Pasaron: ${uPassed} | Fallaron: ${uResults.length - uPassed}</h3>`;
+    console.log(`UNIT_SUMMARY: ${uPassed}/${uResults.length} PASSED`);
+  </script>
+</body>
+</html>

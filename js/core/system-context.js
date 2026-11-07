@@ -3,11 +3,12 @@
  * Equivale a la clase Main del Módulo 3 en Java:
  * - Ensambla los generadores de IDs, repositorios y servicios.
  * - Resuelve las dependencias cruzadas mediante inyección manual.
- * - Carga los datos de ejemplo iniciales o rehidrata el estado persistido en LocalStorage.
+ * - Carga los datos de ejemplo iniciales o rehidrata el estado persistido mediante LocalStorageAdapter.
  */
 
 import { IdGenerator } from './id-generator.js';
 import { InMemoryRepository } from './in-memory-repo.js';
+import { LocalStorageAdapter } from './storage-adapter.js';
 import { Country } from '../models/country.js';
 import { DocumentType } from '../models/document-type.js';
 import { Customer } from '../models/customer.js';
@@ -25,12 +26,17 @@ import { FlightService } from '../services/flight-service.js';
 import { ReservationService } from '../services/reservation-service.js';
 import { loadSeedData } from '../data/seed-data.js';
 
-const STORAGE_KEY = 'aerofasttrack_storage_v1';
-
 export class SystemContext {
   constructor(enablePersistence = true) {
     this._enablePersistence = enablePersistence;
+    this._storageAdapter = new LocalStorageAdapter();
     this._initialized = false;
+    this.corruptedDataError = null;
+    this.storageUnavailable = !this._storageAdapter.isAvailable();
+  }
+
+  get storageAdapter() {
+    return this._storageAdapter;
   }
 
   init() {
@@ -103,7 +109,7 @@ export class SystemContext {
       airlineHasFlights: (airlineId) => this.flightService.airlineHasFlights(airlineId),
     });
 
-    // 5. Registrar listener automático para guardar estado ante cualquier cambio
+    // 5. Configurar listener reactivo de persistencia desacoplado
     const repos = [
       this.countryRepo,
       this.docTypeRepo,
@@ -116,7 +122,7 @@ export class SystemContext {
     ];
     repos.forEach((repo) => {
       repo.setOnChangeListener(() => {
-        if (this._initialized && this._enablePersistence) {
+        if (this._initialized && this._enablePersistence && !this.corruptedDataError) {
           this.saveState();
         }
       });
@@ -124,8 +130,16 @@ export class SystemContext {
 
     // 6. Cargar datos persistidos o datos semilla iniciales
     let loadedFromStorage = false;
-    if (this._enablePersistence && typeof localStorage !== 'undefined') {
-      loadedFromStorage = this.loadState();
+    if (this._enablePersistence && this._storageAdapter.isAvailable()) {
+      const loadResult = this._storageAdapter.load();
+      if (loadResult.status === 'OK') {
+        loadedFromStorage = this._rehydrateState(loadResult.data);
+      } else if (loadResult.status === 'CORRUPTED') {
+        this.corruptedDataError = loadResult.error;
+        console.warn('Se detectó corrupción de datos. Se carga estado en memoria sin sobrescribir el respaldo.', loadResult.error);
+      } else if (loadResult.status === 'UNAVAILABLE') {
+        this.storageUnavailable = true;
+      }
     }
 
     if (!loadedFromStorage) {
@@ -144,7 +158,8 @@ export class SystemContext {
         detailIdGen: this.detailIdGen,
       });
 
-      if (this._enablePersistence && typeof localStorage !== 'undefined') {
+      // Solo guarda por primera vez si no hay un error de corrupción pendiente
+      if (this._enablePersistence && !this.corruptedDataError && this._storageAdapter.isAvailable()) {
         this.saveState();
       }
     }
@@ -154,10 +169,12 @@ export class SystemContext {
   }
 
   /**
-   * Guarda el estado completo de la capa de datos en LocalStorage
+   * Guarda el estado serializado a través del adaptador
    */
   saveState() {
-    if (!this._enablePersistence || typeof localStorage === 'undefined') return;
+    if (!this._enablePersistence || !this._storageAdapter.isAvailable() || this.corruptedDataError) {
+      return { success: false, reason: 'Persistencia desactivada o bloqueada por corrupción' };
+    }
 
     try {
       const state = {
@@ -208,26 +225,19 @@ export class SystemContext {
         })),
       };
 
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      return this._storageAdapter.save(state);
     } catch (err) {
-      console.warn('No se pudo guardar el estado en LocalStorage:', err);
+      console.error('Error al empaquetar estado para persistencia:', err);
+      return { success: false, error: err.message };
     }
   }
 
   /**
-   * Carga y rehidrata el estado desde LocalStorage a los modelos de dominio
-   * @returns {boolean} true si se cargó exitosamente
+   * Rehidrata los datos deserializados reconstruyendo las instancias de objetos y relaciones
+   * @private
    */
-  loadState() {
-    if (typeof localStorage === 'undefined') return false;
-
+  _rehydrateState(state) {
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return false;
-
-      const state = JSON.parse(raw);
-      if (!state || !state.countries || !state.flights) return false;
-
       // 1. Limpiar repositorios
       this.countryRepo.clear();
       this.docTypeRepo.clear();
@@ -281,7 +291,7 @@ export class SystemContext {
         this.reservationRepo.create(new Reservation(r.id, customer, flight, details));
       });
 
-      // 8. Sincronizar Generadores
+      // 8. Sincronizar Generadores de IDs
       if (state.generators) {
         if (state.generators.airline) this.airlineIdGen.sync(state.generators.airline - 10);
         if (state.generators.city) this.cityIdGen.sync(state.generators.city - 1);
@@ -292,18 +302,17 @@ export class SystemContext {
 
       return true;
     } catch (err) {
-      console.warn('Error rehidratando datos de LocalStorage, recurriendo a semillas iniciales:', err);
+      console.error('Error rehidratando instancias de dominio:', err);
       return false;
     }
   }
 
   /**
-   * Restablece el sistema a los datos iniciales de la guía y limpia LocalStorage
+   * Restablece el sistema a los datos iniciales de la guía y limpia el almacenamiento
    */
   resetToSeedData() {
-    if (typeof localStorage !== 'undefined') {
-      localStorage.removeItem(STORAGE_KEY);
-    }
+    this.corruptedDataError = null;
+    this._storageAdapter.clear();
 
     // Reiniciar generadores
     this.airlineIdGen = new IdGenerator(100, 10);
@@ -322,7 +331,7 @@ export class SystemContext {
     this.flightRepo.clear();
     this.reservationRepo.clear();
 
-    // Recargar semillas
+    // Recargar semillas puras
     loadSeedData({
       countryRepo: this.countryRepo,
       docTypeRepo: this.docTypeRepo,
@@ -338,7 +347,7 @@ export class SystemContext {
       detailIdGen: this.detailIdGen,
     });
 
-    if (this._enablePersistence && typeof localStorage !== 'undefined') {
+    if (this._enablePersistence && this._storageAdapter.isAvailable()) {
       this.saveState();
     }
   }
