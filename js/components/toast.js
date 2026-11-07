@@ -6,6 +6,7 @@ class ToastService {
   constructor() {
     this._container = null;
     this._ensureContainer();
+    this._persistenceChecker = null;
   }
 
   _ensureContainer() {
@@ -19,6 +20,15 @@ class ToastService {
       }
       this._container = el;
     }
+  }
+
+  /**
+   * Conecta un verificador de persistencia para evitar mensajes de éxito engañosos
+   * cuando el almacenamiento local haya fallado.
+   * @param {{ hasError: () => boolean, getErrorReason: () => string|null }} checker 
+   */
+  setPersistenceChecker(checker) {
+    this._persistenceChecker = checker;
   }
 
   show({ type = 'info', title = '', message = '', duration = 4000 }) {
@@ -51,6 +61,15 @@ class ToastService {
   }
 
   success(title, message) {
+    // Si la persistencia reporta un fallo activo, evitar el mensaje de éxito engañoso
+    if (this._persistenceChecker && this._persistenceChecker.hasError()) {
+      const reason = this._persistenceChecker.getErrorReason() || 'Almacenamiento no disponible o cuota excedida';
+      this.warning(
+        `Operación en Memoria (${title})`,
+        `${message} — ⚠️ ATENCIÓN: No se pudieron guardar los cambios en este navegador (${reason}). Los datos pueden perderse si recargas o cierras la aplicación.`
+      );
+      return;
+    }
     this.show({ type: 'success', title, message });
   }
 
