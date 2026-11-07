@@ -321,6 +321,18 @@
   justify-content: space-between;
 }
 
+.storage-error-banner {
+  background: rgba(245, 158, 11, 0.22);
+  border-bottom: 1px solid var(--color-warning);
+  color: #fef08a;
+  padding: 0.65rem 2rem;
+  font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
 .page-container {
   padding: 2rem;
   flex: 1;

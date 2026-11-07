@@ -22,6 +22,38 @@ class Application {
     this._currentModule = 'dashboard';
     this._sys = system.init();
     this._clockInterval = null;
+
+    // Conectar toast con el verificador de persistencia
+    toast.setPersistenceChecker({
+      hasError: () => this._sys.hasPersistenceError,
+      getErrorReason: () => this._sys.lastPersistenceError,
+    });
+
+    // Observador para actualizar la UI en vivo si cambia la persistencia
+    this._sys.onPersistenceStatusChange((status) => {
+      this._updatePersistenceUI(status);
+    });
+  }
+
+  _updatePersistenceUI(status) {
+    const pill = document.getElementById('storage-status-pill');
+    const banner = document.getElementById('storage-error-banner');
+
+    if (pill) {
+      if (!status.healthy) {
+        pill.textContent = '⚠️ Almacenamiento: Fallo de Persistencia';
+        pill.style.borderColor = 'var(--color-warning)';
+        pill.style.color = 'var(--color-warning)';
+      } else {
+        pill.textContent = 'Persistencia: Local Activa (v1.0.0)';
+        pill.style.borderColor = 'var(--border-light)';
+        pill.style.color = 'var(--color-accent)';
+      }
+    }
+
+    if (banner) {
+      banner.style.display = status.healthy ? 'none' : 'flex';
+    }
   }
 
   start() {
@@ -156,7 +188,16 @@ class Application {
               <span>ℹ️</span>
               <span><strong>ENTORNO DE DEMOSTRACIÓN</strong> — Los registros iniciales corresponden a datos de prueba de la guía técnica. Los cambios se guardan localmente en este navegador.</span>
             </div>
-            <span class="demo-banner-badge" id="storage-status-pill">${this._sys.storageUnavailable ? '⚠️ Almacenamiento No Disponible' : 'Persistencia: Local Activa (v1.0.0)'}</span>
+            <span class="demo-banner-badge" id="storage-status-pill">${this._sys.hasPersistenceError ? '⚠️ Almacenamiento: Fallo de Persistencia' : 'Persistencia: Local Activa (v1.0.0)'}</span>
+          </div>
+
+          <!-- BANNER DE ADVERTENCIA ANTE ERROR DE PERSISTENCIA ACTIVO -->
+          <div class="storage-error-banner" id="storage-error-banner" style="display: ${this._sys.hasPersistenceError ? 'flex' : 'none'};">
+            <div style="display: flex; align-items: center; gap: 0.6rem;">
+              <span style="font-size: 1.1rem;">⚠️</span>
+              <span><strong>Fallo de Persistencia:</strong> No se pudieron guardar los cambios en este navegador. Los datos pueden perderse si recargas o cierras la aplicación. Comprueba el almacenamiento e inténtalo nuevamente.</span>
+            </div>
+            <button class="btn btn-secondary btn-sm" id="btn-retry-persistence">Reintentar Guardado</button>
           </div>
 
           <!-- BANNER DE ADVERTENCIA EN CASO DE CORRUPCIÓN PREVIA -->
@@ -200,6 +241,20 @@ class Application {
     root.querySelector('#btn-about-system').onclick = () => {
       this.openAboutModal();
     };
+
+    // Botón Reintentar Guardado de Persistencia
+    const retryBtn = root.querySelector('#btn-retry-persistence');
+    if (retryBtn) {
+      retryBtn.onclick = () => {
+        const res = this._sys.saveState();
+        if (res.success) {
+          toast.info('Persistencia Exitosa', 'Todos los cambios pendientes han sido guardados en el almacenamiento local.');
+          this._updatePersistenceUI({ healthy: true });
+        } else {
+          toast.warning('Persistencia Fallida', `Continúa el fallo de almacenamiento: ${res.error || 'Cuota excedida o almacenamiento no disponible'}.`);
+        }
+      };
+    }
 
     // Botón para resolver corrupción si existía
     const fixBtn = root.querySelector('#btn-fix-corrupt');

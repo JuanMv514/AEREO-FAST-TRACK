@@ -33,10 +33,33 @@ export class SystemContext {
     this._initialized = false;
     this.corruptedDataError = null;
     this.storageUnavailable = !this._storageAdapter.isAvailable();
+    this.hasPersistenceError = this.storageUnavailable;
+    this.lastPersistenceError = this.storageUnavailable ? 'Almacenamiento no disponible en este navegador' : null;
+    this._persistenceListeners = [];
   }
 
   get storageAdapter() {
     return this._storageAdapter;
+  }
+
+  /**
+   * Registra un observador para cambios en el estado de persistencia
+   * @param {Function} listener Callback que recibe ({ healthy: boolean, error: string|null, reason: string })
+   */
+  onPersistenceStatusChange(listener) {
+    if (typeof listener === 'function') {
+      this._persistenceListeners.push(listener);
+    }
+  }
+
+  _notifyPersistenceStatusChange(status) {
+    this._persistenceListeners.forEach((l) => {
+      try {
+        l(status);
+      } catch (e) {
+        console.warn('Error en listener de persistencia:', e);
+      }
+    });
   }
 
   init() {
@@ -172,8 +195,22 @@ export class SystemContext {
    * Guarda el estado serializado a través del adaptador
    */
   saveState() {
-    if (!this._enablePersistence || !this._storageAdapter.isAvailable() || this.corruptedDataError) {
-      return { success: false, reason: 'Persistencia desactivada o bloqueada por corrupción' };
+    if (!this._enablePersistence) {
+      return { success: false, reason: 'Persistencia desactivada' };
+    }
+    if (this.corruptedDataError) {
+      return { success: false, reason: 'Persistencia bloqueada por corrupción en cuarentena' };
+    }
+    if (!this._storageAdapter.isAvailable()) {
+      this.storageUnavailable = true;
+      this.hasPersistenceError = true;
+      this.lastPersistenceError = 'Almacenamiento no disponible en este navegador';
+      this._notifyPersistenceStatusChange({
+        healthy: false,
+        error: this.lastPersistenceError,
+        reason: 'UNAVAILABLE',
+      });
+      return { success: false, error: this.lastPersistenceError };
     }
 
     try {
@@ -225,9 +262,38 @@ export class SystemContext {
         })),
       };
 
-      return this._storageAdapter.save(state);
+      const result = this._storageAdapter.save(state);
+      if (!result.success) {
+        this.hasPersistenceError = true;
+        this.lastPersistenceError = result.error || 'Error al guardar en almacenamiento local';
+        this._notifyPersistenceStatusChange({
+          healthy: false,
+          error: this.lastPersistenceError,
+          reason: 'WRITE_ERROR',
+        });
+      } else {
+        const wasInError = this.hasPersistenceError;
+        this.hasPersistenceError = false;
+        this.lastPersistenceError = null;
+        this.storageUnavailable = false;
+        if (wasInError) {
+          this._notifyPersistenceStatusChange({
+            healthy: true,
+            error: null,
+            reason: 'RECOVERED',
+          });
+        }
+      }
+      return result;
     } catch (err) {
       console.error('Error al empaquetar estado para persistencia:', err);
+      this.hasPersistenceError = true;
+      this.lastPersistenceError = err.message;
+      this._notifyPersistenceStatusChange({
+        healthy: false,
+        error: err.message,
+        reason: 'SERIALIZATION_ERROR',
+      });
       return { success: false, error: err.message };
     }
   }
@@ -312,6 +378,8 @@ export class SystemContext {
    */
   resetToSeedData() {
     this.corruptedDataError = null;
+    this.hasPersistenceError = false;
+    this.lastPersistenceError = null;
     this._storageAdapter.clear();
 
     // Reiniciar generadores
