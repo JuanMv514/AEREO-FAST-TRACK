@@ -150,6 +150,23 @@ class Application {
             </div>
           </header>
 
+          <!-- AVISO VISUAL NORMATIVO DE DEMOSTRACIÓN -->
+          <div class="demo-environment-banner">
+            <div class="demo-banner-content">
+              <span>ℹ️</span>
+              <span><strong>ENTORNO DE DEMOSTRACIÓN</strong> — Los registros iniciales corresponden a datos de prueba de la guía técnica. Los cambios se guardan localmente en este navegador.</span>
+            </div>
+            <span class="demo-banner-badge" id="storage-status-pill">${this._sys.storageUnavailable ? '⚠️ Almacenamiento No Disponible' : 'Persistencia: Local Activa (v1.0.0)'}</span>
+          </div>
+
+          <!-- BANNER DE ADVERTENCIA EN CASO DE CORRUPCIÓN PREVIA -->
+          ${this._sys.corruptedDataError ? `
+            <div class="corrupt-warning-banner" id="corrupt-data-banner">
+              <span>⚠️ <strong>Aviso de integridad:</strong> Se detectó una falla al leer datos locales (${this._sys.corruptedDataError}). Se preservó un respaldo en cuarentena sin sobrescribirlo.</span>
+              <button class="btn btn-secondary btn-sm" id="btn-fix-corrupt">Restablecer Semillas de Fábrica</button>
+            </div>
+          ` : ''}
+
           <main class="page-container" id="module-container"></main>
         </div>
       </div>
@@ -184,16 +201,26 @@ class Application {
       this.openAboutModal();
     };
 
+    // Botón para resolver corrupción si existía
+    const fixBtn = root.querySelector('#btn-fix-corrupt');
+    if (fixBtn) {
+      fixBtn.onclick = () => {
+        this._sys.resetToSeedData();
+        toast.success('Restauración Completa', 'Se han restaurado las semillas originales de la guía técnica.');
+        this.renderShell();
+      };
+    }
+
     // Botón Reiniciar Datos de Prueba
     root.querySelector('#btn-reset-seed').onclick = async () => {
       const confirmed = await modal.confirm({
         title: '¿Restablecer Datos de Fábrica?',
-        message: 'Esto recargará todos los datos iniciales de prueba especificados en la guía técnica (5 países, 4 tipos de documento, 3 clientes, 5 ciudades, 6 aeropuertos, 3 aerolíneas, 8 vuelos y 4 reservas). Los registros creados se descartarán.',
+        message: 'Esta acción descartará todos los registros creados o modificados localmente en este navegador y restaurará exactamente el conjunto de datos semilla original de la guía técnica (5 países, 4 tipos de documento, 3 clientes, 5 ciudades, 6 aeropuertos, 3 aerolíneas, 8 vuelos y 4 reservas). ¿Desea continuar?',
         confirmText: 'Restablecer',
       });
       if (confirmed) {
         this._sys.resetToSeedData();
-        toast.success('Datos Reiniciados', 'Se han restablecido los datos originales de la guía.');
+        toast.success('Datos Restablecidos', 'Se han restaurado las semillas originales de la guía técnica.');
         this._updateSidebarBadges();
         this.renderCurrentModule();
       }
