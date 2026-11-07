@@ -1,0 +1,12 @@
+# IDEs y editores
+.idea/
+.vscode/
+*.iml
+
+# Node / Logs
+node_modules/
+*.log
+
+# SO
+.DS_Store
+Thumbs.db

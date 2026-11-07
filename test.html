@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>AeroFastTrack - Verificación de Reglas y Dominio</title>
+  <style>
+    body { font-family: system-ui, sans-serif; background: #0b192c; color: #fff; padding: 2rem; }
+    h1 { color: #38bdf8; }
+    .test { padding: 8px 12px; margin-bottom: 6px; border-radius: 4px; display: flex; justify-content: space-between; }
+    .passed { background: #064e3b; color: #6ee7b7; border-left: 4px solid #10b981; }
+    .failed { background: #7f1d1d; color: #fca5a5; border-left: 4px solid #ef4444; }
+  </style>
+</head>
+<body>
+  <h1>AeroFastTrack - Resultado de Casos de Prueba</h1>
+  <div id="summary"></div>
+  <div id="results"></div>
+
+  <script type="module">
+    import { runAllTests } from './test-runner.js';
+    const results = runAllTests();
+    const resultsContainer = document.getElementById('results');
+    const summaryContainer = document.getElementById('summary');
+
+    let passedCount = 0;
+    results.forEach(r => {
+      const div = document.createElement('div');
+      div.className = `test ${r.passed ? 'passed' : 'failed'}`;
+      div.innerHTML = `<span>${r.name}</span><strong>${r.passed ? '✓ PASÓ' : '✗ FALLÓ: ' + r.error}</strong>`;
+      resultsContainer.appendChild(div);
+      if (r.passed) passedCount++;
+    });
+
+    summaryContainer.innerHTML = `<h3>Total: ${results.length} | Pasaron: ${passedCount} | Fallaron: ${results.length - passedCount}</h3>`;
+    console.log(`TEST_SUMMARY: ${passedCount}/${results.length} PASSED`);
+  </script>
+</body>
+</html>
